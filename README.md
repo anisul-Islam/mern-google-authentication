@@ -66,3 +66,106 @@ export const loginWithGoogle = async (data) => {
 };
 
 ```
+- backend
+- install `npm install google-auth-library`
+```js
+// google
+authRoutes.post("/google-login", handleGoogleLogin);
+
+const { OAuth2Client } = require("google-auth-library");
+const jwt = require("jsonwebtoken");
+
+const handleGoogleLogin = async (req, res) => {
+  try {
+    // creating client which help us to verify the idToken that we receive from front end
+    const client = new OAuth2Client(dev.app.googleClientId);
+
+    // get the idToken form react app request body
+    const { idToken } = req.body;
+    console.log("idToken ", idToken);
+
+    // lets verify the idToken
+    client
+      .verifyIdToken({ idToken, audience: dev.app.googleClientId })
+      .then(async (response) => {
+      
+        console.log("GOOGLE LOGIN RESPONSE", response);
+        const { email_verified, name, email } = response.payload;
+        
+        const exsitingUser = await User.findOne({ email });
+        if (email_verified) {
+        
+          // if the user already exist in our website
+          if (exsitingUser) {
+            console.log("user exist");
+            // create a token for user
+            const token = jwt.sign(
+              { _id: exsitingUser._id },
+              String(dev.app.jwtSecretKey),
+              {
+                expiresIn: "7d",
+              }
+            );
+
+            // step 7: create user info
+            const userInfo = {
+              _id: exsitingUser._id,
+              name: exsitingUser.name,
+              email: exsitingUser.email,
+              phone: exsitingUser.phone,
+              isAdmin: exsitingUser.isAdmin,
+            };
+
+            return res.json({ token, userInfo });
+          } else {
+            // if user does not exist create a new user
+            let password = email + dev.app.jwtSecretKey;
+            const newUser = new User({
+              name,
+              email,
+              password,
+            });
+
+            // console.log(newUser);
+
+            const userData = await newUser.save();
+            if (!userData) {
+              return res.status(400).send({
+                message: "user was not created with google",
+              });
+            }
+
+            // if user is created
+            const token = jwt.sign(
+              { _id: userData._id },
+              String(dev.app.jwtSecretKey),
+              {
+                expiresIn: "7d",
+              }
+            );
+
+            // step 7: create user info
+            const userInfo = {
+              _id: userData._id,
+              name: userData.name,
+              email: userData.email,
+              phone: userData.phone,
+              isAdmin: userData.isAdmin,
+            };
+
+            return res.json({ token, userInfo });
+          }
+        } else {
+          return res.status(400).send({
+            message: "Google login failed try again",
+          });
+        }
+      });
+  } catch (error) {
+    res.send({
+      message: error.message,
+    });
+  }
+};
+
+```
