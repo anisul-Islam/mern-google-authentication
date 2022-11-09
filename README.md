@@ -1,4 +1,4 @@
-# google-authentication
+# mern-google-authentication
 - [doc](https://blog.logrocket.com/guide-adding-google-login-react-app/)
 - front end site
 ```js
